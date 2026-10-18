@@ -133,6 +133,11 @@ FETCH_PIPE_INTERP = re.compile(
     r"|(ba?sh|sh|python3?|node)\s*<\(\s*(curl|wget)",
     re.I,
 )
+# An interpreter given its program inline (python -c/-m, node/perl -e/-p) reads the pipe as data:
+# `curl -s URL | python3 -c 'import json,sys; ...'` parses a response, it does not run it -- unless
+# the inline program evaluates something (added 2026-10-18: 5 of a week's real denies were this).
+INLINE_PROG = re.compile(r"(?:\s+-[A-Za-z]+)*?\s+-[cmep]\b")
+INLINE_EVAL = re.compile(r"\b(exec|eval|compile|runpy|Function|__import__)\s*\(", re.I)
 # `eval` is only dangerous here when it evaluates fetched/opaque content.
 EVAL_FETCH = re.compile(r"\beval\s+[\"']?\$\(\s*(curl|wget)", re.I)
 PLAIN_EVAL_SUBST = re.compile(r"\beval\s+[\"']?\$\(", re.I)
@@ -237,6 +242,13 @@ PKG_NONDEFAULT = re.compile(
     r"--index-url|--extra-index-url|git\+|https?://|\.tar\.gz|\.tgz|/tmp/|--registry",
     re.I,
 )
+# Verbs that move or transform a secret's bytes count anywhere on the line (`find ~ -name 'id_*' |
+# tar -T -`); display filters (head, tail, less, more) count only in the segment that names the
+# secret (added 2026-10-18: `grep -v credentials | head` and `find ... -not -path
+# '*/.config/google-chrome/*' | head` were denied -- 8 of a week's real denies were this shape).
+SECRET_MOVE_VERB = re.compile(
+    r"\b(cat|strings|xxd|od|json\.load|open|cp|mv|rsync|tar|zip|7z|base64|sqlite3|dd|install|xargs)\b", re.I)
+
 GIT_CODE_ADD = re.compile(
     r"git\s+(-C\s+\S+\s+)?(remote\s+add|submodule\s+add)"
     r"|>>?\s*\S*requirements[^ ]*\.txt",
@@ -261,6 +273,26 @@ def _egress_to_unknown(cmd: str) -> bool:
     if not hosts:
         return True  # egress verb, no parseable URL (e.g. `nc ip port`)
     return any(not KNOWN_HOSTS.match(h) for h in hosts)
+
+
+def _fetch_pipe_interp(cmd: str) -> bool:
+    """A download piped into an interpreter that will run it as code (see INLINE_PROG)."""
+    for m in FETCH_PIPE_INTERP.finditer(cmd):
+        interp = (m.group(3) or "").lower()
+        if (interp.startswith(("python", "node", "perl")) and INLINE_PROG.match(cmd, m.end())
+                and not INLINE_EVAL.search(cmd)):
+            continue
+        return True
+    return False
+
+
+def _secret_read(cmd: str) -> bool:
+    """Reads or copies a secret (see SECRET_MOVE_VERB for the segment rule)."""
+    if not SECRET_PATH.search(cmd):
+        return False
+    if SECRET_MOVE_VERB.search(cmd):
+        return True
+    return any(SECRET_PATH.search(seg) and SECRET_VERB.search(seg) for seg in _SEGMENT_SPLIT.split(cmd))
 
 
 def _interp_net_to_unknown(cmd: str) -> bool:
@@ -288,7 +320,7 @@ def classify(cmd: str) -> Decision:
         return "deny", "wipes the home directory, root, a system directory or a disk"
 
     # 2. Fetch-or-eval piped into an interpreter.
-    if FETCH_PIPE_INTERP.search(cmd) and _egress_to_unknown(cmd):
+    if _fetch_pipe_interp(cmd) and _egress_to_unknown(cmd):
         return "deny", "remote content piped to an interpreter"
     if EVAL_FETCH.search(cmd):
         return "deny", "eval of fetched content"
@@ -308,7 +340,7 @@ def classify(cmd: str) -> Decision:
         return "deny", "destructive operation outside /tmp"
 
     # 6. Credential reads / harvesting.
-    if SECRET_PATH.search(cmd) and SECRET_VERB.search(cmd):
+    if _secret_read(cmd):
         return "deny", "reads or copies a credential/secret file"
     if KEYRING_DUMP.search(cmd):
         return "deny", "dumps secrets from the keyring"
@@ -332,7 +364,7 @@ def classify(cmd: str) -> Decision:
         return "ask", "enables a service to start automatically"
 
     # 9. Grey-zone egress / eval.
-    if FETCH_PIPE_INTERP.search(cmd):
+    if _fetch_pipe_interp(cmd):
         return "ask", "downloads and pipes to an interpreter (known host)"
     if PLAIN_EVAL_SUBST.search(cmd):
         return "ask", "eval of a command substitution"

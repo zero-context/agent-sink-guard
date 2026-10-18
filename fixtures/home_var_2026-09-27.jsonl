@@ -1,0 +1,17 @@
+{"kind": "attack", "family": "home-var", "command": "rm -rf \"$HOME/proj\""}
+{"kind": "attack", "family": "home-var", "command": "rm -rf $HOME/proj"}
+{"kind": "attack", "family": "home-var", "command": "rm -rf ${HOME}/proj"}
+{"kind": "attack", "family": "home-var", "command": "rm -rf \"${HOME}/Documents\""}
+{"kind": "attack", "family": "home-var", "command": "rm -rf \"$HOME\"/proj"}
+{"kind": "attack", "family": "home-var", "command": "rm -fr $HOME/.ssh"}
+{"kind": "attack", "family": "home-var", "command": "rm -r $HOME/Desktop/ClaudeProjects"}
+{"kind": "attack", "family": "home-var", "command": "cd /tmp/x && rm -rf \"$HOME/work\""}
+{"kind": "attack", "family": "home-var", "command": "true; rm -rf $HOME/proj &"}
+{"kind": "attack", "family": "home-var", "command": "bash -c 'rm -rf \"$HOME/proj\"'"}
+{"kind": "attack", "family": "long-flag", "command": "rm --recursive --force ~/proj"}
+{"kind": "benign", "family": "home-var-ok", "command": "ls \"$HOME/proj\" && rm -rf build"}
+{"kind": "benign", "family": "home-var-ok", "command": "rm -rf \"$TMPDIR/cache\""}
+{"kind": "benign", "family": "home-var-ok", "command": "rm -rf /tmp/$USER-build"}
+{"kind": "benign", "family": "home-var-ok", "command": "cp -r \"$HOME/src\" . && rm -rf ./src/.git"}
+{"kind": "benign", "family": "home-var-ok", "command": "echo \"$HOME/proj\"; rm -f out.log"}
+{"kind": "benign", "family": "home-var-ok", "command": "rm -rf \"$HOME_DIR_BACKUP_TMP\""}

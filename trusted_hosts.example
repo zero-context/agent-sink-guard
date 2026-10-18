@@ -1,0 +1,10 @@
+# Extra hosts the guard should not treat as "unknown": your own machines
+# (ssh aliases) and your LAN. Copy to trusted_hosts.local and edit; that file
+# is gitignored. One regex per line, anchored to the whole host.
+# A trusted host only removes the "egress to an unrecognised host" prompt --
+# reading a secret and sending it anywhere is still denied.
+# The test suite loads this file, so the example hosts below are also the
+# hosts used in fixtures/blind2_2026-09-27.jsonl.
+laptop
+devbox
+192\.168\.1\.\d{1,3}

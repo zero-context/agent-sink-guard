@@ -1,0 +1,7 @@
+logs/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+trusted_hosts.local
+fixtures/private/
